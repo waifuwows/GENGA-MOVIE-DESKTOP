@@ -3,7 +3,7 @@
 **Genga Movie** is a premium, standalone desktop application designed for the ultimate media discovery and playback experience. Built with a high-performance hybrid architecture, it aggregates metadata and streams from across the web—including Movies, Anime, Manga, Music, and Light Novels—into a single, stunning glassmorphic interface.
 
 > [!IMPORTANT]
-> **v1.1.6 is Natively Standalone.** Users are no longer required to install Python, Node.js, or any external dependencies. All engines are bundled directly into the application.
+> **v1.0.0 is Natively Standalone.** Users are no longer required to install Python, Node.js, or any external dependencies. All engines are bundled directly into the application.
 
 ---
 
