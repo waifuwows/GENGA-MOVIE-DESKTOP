@@ -1,4 +1,4 @@
-# 🎬 Genga Movie Desktop (v1.1.6)
+# 🎬 Genga Movie Desktop (v1.0.0)
 
 **Genga Movie** is a premium, standalone desktop application designed for the ultimate media discovery and playback experience. Built with a high-performance hybrid architecture, it aggregates metadata and streams from across the web—including Movies, Anime, Manga, Music, and Light Novels—into a single, stunning glassmorphic interface.
 
