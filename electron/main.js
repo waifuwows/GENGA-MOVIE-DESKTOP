@@ -43,13 +43,30 @@ function startNodeBridge() {
     }
 
     try {
+        if (!isPackaged) {
+            bridgeLog(`Starting bridge via spawn for development: ${bridgePath}`);
+            nodeBridgeProcess = spawn('node', [bridgePath], {
+                cwd: path.dirname(bridgePath),
+                stdio: 'pipe',
+                env: { ...process.env, NODE_ENV: 'development' }
+            });
+
+            nodeBridgeProcess.stdout.on('data', (data) => bridgeLog(`[BRIDGE] ${data.toString()}`));
+            nodeBridgeProcess.stderr.on('data', (data) => bridgeLog(`[BRIDGE ERROR] ${data.toString()}`));
+            nodeBridgeProcess.on('exit', (code) => {
+                bridgeLog(`Bridge spawned process exited with code ${code}.`);
+                if (code !== 0 && code !== null) setTimeout(startNodeBridge, 5000);
+            });
+            return;
+        }
+
         bridgeLog(`Forking utilityProcess: ${bridgePath}`);
         nodeBridgeProcess = utilityProcess.fork(bridgePath, [], {
-            cwd: isPackaged ? process.resourcesPath : path.dirname(bridgePath),
+            cwd: process.resourcesPath,
             stdio: 'pipe',
             env: { 
                 ...process.env,
-                NODE_ENV: isPackaged ? 'production' : 'development'
+                NODE_ENV: 'production'
             }
         });
 

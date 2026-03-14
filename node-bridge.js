@@ -41,33 +41,57 @@ process.on('unhandledRejection', (reason, promise) => {
     log(`FATAL: Unhandled Rejection at: ${promise} reason: ${reason}`);
 });
 
+const axios = require('axios');
+const cheerio = require('cheerio');
+
 let MANGA, NEWS, ANIME, HiAnime;
-try {
-    const ext = require('@consumet/extensions');
-    MANGA = ext.MANGA;
-    NEWS = ext.NEWS;
-    ANIME = ext.ANIME;
-    HiAnime = require('@genga-movie/aniwatch').HiAnime;
-    log('All extensions loaded successfully');
-} catch (e) {
-    log(`CRITICAL: Failed to load extensions: ${e.message}`);
-    process.exit(1);
+let hianime, hianime2, gogoanime, mangapill;
+
+async function initExtensions() {
+    try {
+        const ext = require('@consumet/extensions');
+        MANGA = ext.MANGA;
+        NEWS = ext.NEWS;
+        ANIME = ext.ANIME;
+        
+        // Use dynamic import for the ESM aniwatch package
+        const aniwatchModule = await import('@genga-movie/aniwatch');
+        HiAnime = aniwatchModule.HiAnime;
+        
+        log('All extensions loaded successfully');
+        log(`HiAnime type: ${typeof HiAnime}, default type: ${typeof (HiAnime || {}).default}`);
+        log(`ANIME.Hianime type: ${typeof ANIME.Hianime}, default type: ${typeof (ANIME.Hianime || {}).default}`);
+        
+        const create = (cls) => {
+            if (!cls) return null;
+            if (typeof cls === 'function') return new cls();
+            if (cls.default && typeof cls.default === 'function') return new cls.default();
+            // Handle case where it's an object with the class inside
+            const firstKey = Object.keys(cls)[0];
+            if (firstKey && typeof cls[firstKey] === 'function') return new cls[firstKey]();
+            return null;
+        };
+
+        hianime = create(HiAnime) || new (HiAnime.HiAnime || HiAnime.default || HiAnime)();
+        hianime2 = create(ANIME.Hianime);
+        try {
+            gogoanime = create(ANIME.AnimeSama) || { search: () => ({ results: [] }), fetchAnimeInfo: () => ({ episodes: [] }) }; 
+        } catch (e) {
+            log(`Warning: Gogo fallback init failed: ${e.message}`);
+            gogoanime = { search: () => ({ results: [] }), fetchAnimeInfo: () => ({ episodes: [] }) };
+        }
+        mangapill = create(MANGA.MangaPill);
+        
+        return true;
+    } catch (e) {
+        log(`CRITICAL: Failed to load extensions: ${e.message}`);
+        return false;
+    }
 }
 
 const app = express();
 const port = 8001;
-
-const hianime = new HiAnime();
-const hianime2 = new ANIME.Hianime();
-// Use AnimeSama instead of Gogoanime to avoid 'got-scraping' export errors in packaged app
-let gogoanime;
-try {
-    gogoanime = new ANIME.AnimeSama(); 
-} catch (e) {
-    log(`Warning: Gogo fallback init failed: ${e.message}`);
-    gogoanime = { search: () => ({ results: [] }), fetchAnimeInfo: () => ({ episodes: [] }) };
-}
-const mangapill = new MANGA.MangaPill();
+// Instances will be initialized in startServer()
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -380,8 +404,8 @@ app.get('/manga/mangapill/:param1', async (req, res) => {
 });
 
 // 5. Catch-all for catch-all (details/)*
-app.get('/manga/details/*', async (req, res) => {
-    const id = req.params[0];
+app.get('/manga/details/:id', async (req, res) => {
+    const id = req.params.id;
     log(`[Manga Bridge] Catch-all details: ${id}`);
     // Redirect to info logic
     req.query.id = id;
@@ -394,8 +418,7 @@ app.get('/manga/details/*', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // --- News ---
-const axios = require('axios');
-const cheerio = require('cheerio');
+// axios and cheerio moved to top
 async function fetchNews() {
     return withRetry(async () => {
         log('Fetching latest news from ANN...');
@@ -458,8 +481,18 @@ app.get('/news/info', async (req, res) => {
     } 
 });
 
-app.listen(port, '127.0.0.1', () => { 
-    log(`Bridge listening at http://127.0.0.1:${port}`); 
-    // Heartbeat to confirm bridge is alive in logs
-    setInterval(() => log('Heartbeat: Bridge is alive'), 30000);
-});
+async function startServer() {
+    const success = await initExtensions();
+    if (!success) {
+        log('Targeting exit due to extension load failure');
+        process.exit(1);
+    }
+
+    app.listen(port, '0.0.0.0', () => { 
+        log(`Bridge listening at http://0.0.0.0:${port}`); 
+        // Heartbeat to confirm bridge is alive in logs
+        setInterval(() => log('Heartbeat: Bridge is alive'), 30000);
+    });
+}
+
+startServer();
